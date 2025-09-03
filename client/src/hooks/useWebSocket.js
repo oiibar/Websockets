@@ -6,6 +6,7 @@ export function useWebSocket(username) {
     const [typingUsers, setTypingUsers] = useState([]);
     const [connected, setConnected] = useState(false);
     const timeoutRef = useRef(null);
+    const lastSentRef = useRef(0);
 
     function connect() {
         ws.current = new WebSocket('ws://localhost:8080')
@@ -13,6 +14,7 @@ export function useWebSocket(username) {
         ws.current.onopen = () => {
             setConnected(true);
             ws.current.send(JSON.stringify({
+                timestamp: Date.now(),
                 username,
                 message: `${username} connected`,
                 event: 'connection'
@@ -42,6 +44,7 @@ export function useWebSocket(username) {
     function disconnect() {
         setConnected(false);
         ws.current?.send(JSON.stringify({
+            timestamp: Date.now(),
             username,
             message: `${username} disconnected`,
             event: 'disconnection'
@@ -50,7 +53,14 @@ export function useWebSocket(username) {
     }
 
     function sendMessage(text) {
+        const now = Date.now();
+        if(Date.now() - lastSentRef.current < 2000) {
+            return;
+        }
+        lastSentRef.current = now;
+
         ws.current.send(JSON.stringify({
+            timestamp: now,
             username,
             message: text,
             event: 'message',

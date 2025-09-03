@@ -1,4 +1,5 @@
 import React from "react";
+import {formatTimestamp} from '../utils/formatTimestamp.js'
 
 function MessagesList({messages}) {
     return (
@@ -8,8 +9,8 @@ function MessagesList({messages}) {
                     <ul>
                         {messages.map((msg, index) => (
                             msg.event === 'disconnection' || msg.event === 'connection'
-                                ? <div key={index}>{msg.message}</div>
-                                : <div key={index}>{msg.username}: {msg.message}</div>
+                                ? <div key={index}><i>{formatTimestamp(msg.timestamp)}</i> {msg.message}</div>
+                                : <div key={index}>{msg.username} <i>{formatTimestamp(msg.timestamp)}</i>: {msg.message}</div>
                         ))}
                     </ul>
                 )
