@@ -7,6 +7,7 @@ export function useWebSocket(username) {
     const [connected, setConnected] = useState(false);
     const timeoutRef = useRef(null);
     const lastSentRef = useRef(0);
+    const [users, setUsers] = useState([]);
 
     function connect() {
         ws.current = new WebSocket('ws://localhost:8080')
@@ -34,6 +35,9 @@ export function useWebSocket(username) {
                     break;
                 case "stop_typing":
                     setTypingUsers(prev => prev.filter(u => u !== msg.username));
+                    break;
+                case "user_states":
+                    setUsers(prev => [...prev, msg.username]);
                     break;
                 default:
                     setMessages(prev => [msg, ...prev]);
@@ -83,5 +87,5 @@ export function useWebSocket(username) {
         }, 2000)
     }
 
-    return { connect, disconnect, sendMessage, sendTyping, connected, messages, typingUsers };
+    return { connect, disconnect, sendMessage, sendTyping, connected, messages, typingUsers, users };
 }
