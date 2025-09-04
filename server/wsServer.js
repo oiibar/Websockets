@@ -1,56 +1,75 @@
-import {WebSocketServer} from 'ws'
-import {broadcast} from "./utils/broadcast.js";
-import {heartbeat} from "./utils/heartbeat.js";
+import { WebSocketServer } from 'ws'
+import { broadcast } from "./utils/broadcast.js";
+import { heartbeat } from "./utils/heartbeat.js";
+
+const usersList = new Map();
 
 export function createWSServer(port = 8080) {
-    const wss = new WebSocketServer({port}, () => {
+    const wss = new WebSocketServer({ port }, () => {
         console.log('Websocket server running on port', port);
-    })
+    });
 
     wss.on('connection', function connection(ws) {
         ws.isAlive = true;
+        ws.username = null;
 
         ws.on('pong', heartbeat);
 
-        ws.on('message', (message)=> {
+        ws.on('message', (message) => {
             try {
-                ws.bufferedAmount
-                const msg = JSON.parse(message.toString())
-                switch(msg.event) {
-                    case 'message':
+                const msg = JSON.parse(message.toString());
+
+                switch (msg.event) {
                     case 'connection':
+                        ws.username = msg.username;
+                        usersList.set(msg.username, 'online');
+
+                        broadcast(wss, msg, ws);
+                        broadcast(wss, {
+                            event: 'users_list',
+                            users: Array.from(usersList, ([username, status]) => ({ username, status }))
+                        }, ws);
+                        break;
+
+                    case 'message':
+                        usersList.set(msg.username, 'online'); // keep them online
+                        broadcast(wss, msg, ws);
+                        break;
+
                     case 'disconnection':
+                        usersList.set(msg.username, 'offline');
+                        broadcast(wss, msg, ws);
+                        broadcast(wss, {
+                            event: 'users_list',
+                            users: Array.from(usersList, ([username, status]) => ({ username, status }))
+                        }, ws);
+                        break;
+
                     case 'typing':
                     case 'stop_typing':
-                        broadcast(wss, msg, ws)
+                        broadcast(wss, msg, ws);
                         break;
                 }
             } catch (err) {
                 console.error('Invalid message received:', err);
             }
-        })
+        });
 
-        const interval = setInterval(() => {
-            wss.clients.forEach((ws) => {
-                if (ws.isAlive === false) {
-                    console.log('Terminating dead client');
-                    return ws.terminate();
-                }
+        ws.on('close', () => {
+            if (ws.username) {
+                usersList.set(ws.username, 'offline');
 
-                ws.isAlive = false;
-                ws.ping();
-            });
-        }, 10000)
+                broadcast(wss, {
+                    event: 'users_list',
+                    users: Array.from(usersList, ([username, status]) => ({ username, status }))
+                }, ws);
+            }
+        });
 
         ws.on('error', (err) => {
             console.error('WebSocket error:', err);
         });
-
-        ws.on('close', (code, reason) => {
-            clearInterval(interval)
-            console.log(`Client disconnected. Code: ${code}, Reason: ${reason.toString()}`);
-        });
-    })
+    });
 
     return wss;
 }
